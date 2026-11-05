@@ -1,0 +1,13 @@
+{
+  "name": "grand-squeeze-baccarat-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Multiplayer table server for Grand Squeeze Baccarat (virtual chips only). No dependencies.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
