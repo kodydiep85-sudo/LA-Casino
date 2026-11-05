@@ -553,8 +553,12 @@ body{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
 /* a flat felt: no tilt, so the printing and the chips stay sharp */
 .tub{transform:none!important;margin-top:.5cqw!important}
 @media(min-width:1000px){.tub{transform:scale(var(--fit,.92))!important;transform-origin:50% 0!important;margin-top:0!important}}
-@media(min-width:1000px){.dicezone .dhint{left:auto;right:1.4cqw;bottom:50%;transform:translateY(50%);text-align:right;max-width:28%;line-height:1.5}}
+.dicezone .dhint{display:none}
 @media(max-width:999px){.dicezone .dhint{display:none}}
+.stick{position:absolute;left:0;top:0;height:clamp(7px,.75cqw,11px);transform-origin:0 50%;z-index:5;pointer-events:none;border-radius:4px;
+ background:linear-gradient(#e8c48a,#b07a3c 45%,#7a4c1e);box-shadow:0 3px 6px #0008}
+.stick::after{content:'';position:absolute;right:-2px;top:50%;width:clamp(20px,2.4cqw,32px);height:clamp(14px,1.6cqw,22px);transform:translate(40%,-50%);
+ border:clamp(4px,.45cqw,6px) solid #8a5826;border-left:0;border-radius:0 50% 50% 0}
 </style>
 <link rel="stylesheet" href="casino.css">
 <script src="casino.js" defer></script>
@@ -978,7 +982,29 @@ body{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
  const WH=()=>parseFloat(getComputedStyle($('tub')).getPropertyValue('--wh'))||20;
  const tz=(pos)=>ds()/2+(pos.felt?0:WH());   // the rail sits higher than the felt
  const T3=(x,y,z)=>`translate3d(${x}px,${y}px,${z}px)`;
- function placeDie(i,pos,face){D[i].style.transform=T3(pos.x,pos.y,tz(pos));D[i].firstChild.style.transform=rot(face)}
+ function placeDie(i,pos,face){D[i]._pos=pos;D[i]._face=face;D[i].style.transform=T3(pos.x,pos.y,tz(pos));D[i].firstChild.style.transform=rot(face)}
+ /* ---------- the stickman reaches across with the stick and slides the dice back to you ---------- */
+ let sweep=null;
+ function stickSweep(){if(sweep)return;if(diceAt==='hand'){diceToHand();return}
+  const g=geo(),s=ds(),zone=$('diceZone'),to=[0,1].map(handSpot),from=[0,1].map(i=>D[i]._pos||to[i]);
+  const st=document.createElement('div');st.className='stick';zone.appendChild(st);
+  const base={x:g.inX+g.inW*.5,y:g.wallY-s*2.6},mid=p=>({x:(p[0].x+p[1].x)/2,y:(p[0].y+p[1].y)/2});
+  const c0=mid(from),c1=mid(to),tip0={x:c0.x,y:c0.y-s*.15},tip1={x:c1.x,y:c1.y-s*.15};
+  const faces=[0,1].map(i=>D[i]._face||setFaces[i]);
+  const ease=t=>t<.5?2*t*t:1-(-2*t+2)**2/2,lerp=(a,b,t)=>({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});
+  const setStick=(tip,op)=>{const dx=tip.x-base.x,dy=tip.y-base.y,len=Math.hypot(dx,dy);st.style.width=len+'px';
+   st.style.transform=`translate3d(${base.x}px,${base.y}px,${s*.9}px) rotate(${Math.atan2(dy,dx)}rad)`;st.style.opacity=op};
+  const T0=performance.now(),R=380,P=760,B=360;let raf=0;
+  const finish=()=>{cancelAnimationFrame(raf);st.remove();sweep=null;diceToHand()};
+  sweep={finish};SFX.chip&&SFX.chip();
+  const step=now=>{const t=now-T0;
+   if(t<R){setStick(lerp(base,tip0,ease(t/R)),Math.min(1,t/120))}
+   else if(t<R+P){const k=ease((t-R)/P),tip=lerp(tip0,tip1,k);setStick(tip,1);
+    [0,1].forEach(i=>{const q=lerp(from[i],to[i],k);D[i].style.transform=T3(q.x+Math.sin(k*9+i)*s*.03,q.y,tz(k<.92?{felt:true}:to[i]));D[i].firstChild.style.transform=rot(faces[i])})}
+   else if(t<R+P+B){const k=ease((t-R-P)/B);setStick(lerp(tip1,base,k),1-k)}
+   else return finish();
+   raf=requestAnimationFrame(step)};
+  raf=requestAnimationFrame(step)}
  function diceToHand(){[0,1].forEach(i=>placeDie(i,handSpot(i),setFaces[i]));diceAt='hand';$('diceZone').classList.add('inhand')}
  /* ---------- the throw: real bounces off the felt, the walls and each other ---------- */
  function simulate(from,g,s,fwd){
@@ -1032,7 +1058,7 @@ body{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
    el.animate(F.map(f=>({transform:T3(f[1],f[2],f[3]),offset:Math.min(1,f[0]/sim.dur)})),{duration:dur,easing:'linear'});
    cube.animate([{transform:rot(m.set[i]||setFaces[i]),offset:0}].concat(F.map(f=>{const left=1-f[4]/total;
      return {transform:rot(v,360*turnsX*left,360*turnsY*left),offset:Math.max(.02,Math.min(1,f[0]/sim.dur))}})),{duration:dur,easing:'linear'});
-   const last=F[F.length-1];D[i].style.transform=T3(last[1],last[2],last[3]);cube.style.transform=rot(v);
+   const last=F[F.length-1];D[i].style.transform=T3(last[1],last[2],last[3]);cube.style.transform=rot(v);D[i]._pos={x:last[1],y:last[2],felt:true};D[i]._face=v;
   });
   // a clack for every hit, louder for harder ones
   let lastHit=-1;sim.hits.forEach(([ht,str])=>{if(ht-lastHit<.05)return;lastHit=ht;setTimeout(()=>SFX.clack(str<.45),ht*1000)});
@@ -1056,6 +1082,7 @@ body{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
   diceToHand();
   if(d&&Math.abs(dy)<12){const i=+d.dataset.i;setFaces[i]=setFaces[i]%6+1;placeDie(i,handSpot(i),setFaces[i]);SFX.click();message(`Dice set: ${setFaces[0]} and ${setFaces[1]} on top. Flick them down the table, or tap Throw.`)}
  });
+ $('diceZone').addEventListener('pointerdown',()=>{if(sweep)sweep.finish()},true);
  $('diceZone').addEventListener('pointercancel',()=>{drag=null;if(diceAt==='hand')diceToHand()});
  function doThrow(pw){if(!shooterIsMe()||rolling())return;SFX.click();if(v3d&&show3d({shooter:true,set:setFaces}))return;conn.send({t:'roll',set:setFaces.slice()})}
 
@@ -1098,7 +1125,7 @@ body{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
   const p=me();
   message(`${m.sum}: ${m.call}${m.sevenOut&&m.newShooter&&!solo()?` The dice pass to ${(S.players.find(x=>x.id===m.newShooter)||{}).name||'the next player'}.`:''}${r&&r.lines.length?` ${r.net>0?`You won ${fmt(r.net)}.`:r.net<0?`You lost ${fmt(-r.net)}.`:''}`:''}`);
   // the stickman pushes the dice back to the shooter
-  setTimeout(()=>{if(shooterIsMe()&&!rolling())diceToHand()},2200);
+  setTimeout(()=>{if(shooterIsMe()&&!rolling())stickSweep()},1900);
   return 300;
  }
 
