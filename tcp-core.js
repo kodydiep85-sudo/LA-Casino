@@ -9,11 +9,11 @@
 const ROOM = { name: 'The Parlor', min: 5, max: 500, sideMax: 100, jackpotBet: 5, seats: 5 };
 // table limits, like the baccarat rooms: pick your table; no maximum on any bet (the jackpot light stays $5)
 const TIERS = {
-  lounge:  { name: 'Lounge',       min: 5,     max: 1e12, sideMax: 1e12 },
-  high:    { name: 'High Limit',   min: 25,    max: 1e12, sideMax: 1e12 },
-  vip:     { name: 'VIP Salon',    min: 100,   max: 1e12, sideMax: 1e12 },
-  private: { name: 'Private Room', min: 1000,  max: 1e12, sideMax: 1e12 },
-  diamond: { name: 'Diamond Room', min: 10000, max: 1e12, sideMax: 1e12 },
+  lounge:  { name: 'Lounge',       min: 10,    max: 1e12, sideMax: 1e12, sideMin: 10 },
+  high:    { name: 'High Limit',   min: 25,    max: 1e12, sideMax: 1e12, sideMin: 25 },
+  vip:     { name: 'VIP Salon',    min: 100,   max: 1e12, sideMax: 1e12, sideMin: 0 },
+  private: { name: 'Private Room', min: 1000,  max: 1e12, sideMax: 1e12, sideMin: 0 },
+  diamond: { name: 'Diamond Room', min: 10000, max: 1e12, sideMax: 1e12, sideMin: 0 },
 };
 const LIM = room => TIERS[room && room.tier] || TIERS.lounge;
 // the progressive: a $5 light that wins the whole meter on a 5-card royal flush (your three cards with the dealer's three)
@@ -259,6 +259,7 @@ function handle(ws, msg) {
       const b = msg.bets || {}, ante = Math.floor(+b.ante || 0), pair = Math.floor(+b.pair || 0), six = Math.floor(+b.six || 0), jack = b.jack ? ROOM.jackpotBet : 0;
       if (ante < 0 || pair < 0 || six < 0) return;
       if (ante > LIM(room).max) { send(ws, { t: 'error', msg: `The Ante maximum is ${money(LIM(room).max)}.` }); return pushState(room); }
+      if ((pair && pair < LIM(room).sideMin) || (six && six < LIM(room).sideMin)) { send(ws, { t: 'error', msg: `Side bets at the ${LIM(room).name} table start at ${money(LIM(room).sideMin)}.` }); return pushState(room); }
       if (pair > LIM(room).sideMax || six > LIM(room).sideMax) { send(ws, { t: 'error', msg: `Pair Plus and the 6-Card Bonus go up to ${money(LIM(room).sideMax)}.` }); return pushState(room); }
       const want = ante + pair + six + jack, have = me.balance + stake(me);
       if (want > have) { send(ws, { t: 'error', msg: 'Not enough chips for that.' }); return pushState(room); }

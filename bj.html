@@ -566,6 +566,17 @@ body{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
   <button class="buygo" id="tierGo">Sit down</button>
  </div>
 </div>
+<div class="modal" id="dblPick" hidden>
+ <div class="mcard" role="dialog" aria-modal="true" aria-labelledby="dblTitle" style="max-width:380px;text-align:center">
+  <h2 id="dblTitle">DOUBLE DOWN</h2>
+  <p>How do you want your card?</p>
+  <div style="display:grid;gap:8px;margin:10px 0">
+   <button class="buygo" id="dblDown">Face down</button>
+   <button class="buygo" id="dblUp">Face up</button>
+  </div>
+  <button class="buykeep" id="dblNo">Cancel</button>
+ </div>
+</div>
 <div class="modal" id="buy" hidden>
  <div class="mcard buycard" role="dialog" aria-modal="true" aria-labelledby="buyTitle">
   <h2 id="buyTitle">BUY IN</h2>
@@ -606,7 +617,7 @@ body{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
   <h3>3 · Play your hand</h3>
   <ul>
    <li><b>Hit</b> for another card, or <b>Stand</b>.</li>
-   <li><b>Double</b>: double your bet on your first two cards and take exactly one more card.</li>
+   <li><b>Double</b>: double your bet on your first two cards and take exactly one more card. You choose to get it <b>face down</b> (it turns over after the dealer finishes) or <b>face up</b>.</li>
    <li><b>Split</b> two cards of the same value into two hands (another bet the same size), up to four hands. Split Aces get one card each. You can double after a split.</li>
   </ul>
   <p>At a friends' table you have 15 seconds for the Bust Bonus and insurance, and 30 seconds a turn (if time runs out you stand).</p>
@@ -812,6 +823,7 @@ body{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
      p.hands.forEach((h,i)=>{const row=handBox(p.seat,i).querySelector('.bjcards');drawn[i]=[addCard(row,h.cards[0],false)]});
     }
     p.hands.forEach((h,i)=>{drawn[i]=drawn[i]||[];const row=handBox(p.seat,i).querySelector('.bjcards');
+     for(let k=0;k<drawn[i].length;k++)if(h.cards[k]&&isDown(drawn[i][k]))flipEl(drawn[i][k],h.cards[k]);   // a face-down double turns over when the hand is paid
      for(let k=drawn[i].length;k<h.cards.length;k++)drawn[i].push(addCard(row,h.cards[k],true))});
    }
    m.dealer.forEach((c,k)=>{
@@ -826,8 +838,9 @@ body{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
  function renderTotals(m){
   m=m||S;if(!m)return;
   for(const p of m.players){(p.hands||[]).forEach((h,i)=>{const box=seatEl(p.seat).querySelector('.bjhands').children[i];if(!box)return;
-   const t=H.total(h.cards).t,bj=h.cards.length===2&&!h.split&&t===21,el=box.querySelector('.bjtot');
-   el.textContent=bj?'Blackjack!':t>21?`Bust · ${t}`:showTot(h.cards)+(h.doubled?' · doubled':'');
+   const el=box.querySelector('.bjtot');if(h.cards.some(c=>!c)){el.textContent=`${showTot(h.cards.filter(Boolean))} + ? · doubled face down`;el.className='bjtot';box.classList.remove('turn');return}
+   const t=H.total(h.cards).t,bj=h.cards.length===2&&!h.split&&t===21;
+   el.textContent=bj?'Blackjack!':t>21?`Bust · ${t}`:showTot(h.cards)+(h.doubled?(h.down?' · doubled face down':' · doubled'):'');
    el.className='bjtot'+(bj?' bj':t>21?' bust':'');
    box.classList.toggle('turn',!!(m.stage==='play'&&m.turn&&m.turn.id===p.id&&m.turn.hand===i))})}
   const shown=(m.dealer||[]).filter(Boolean);
@@ -891,7 +904,7 @@ body{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
    if(!p.inHand)return['Sitting out',''];
    if(S.stage==='pre')return p.preDone||S.solo?[p.insured?'Insured':'',p.insured?'ok':'']:['Bust Bonus?','go'];
    if(S.stage==='play'&&S.turn&&S.turn.id===p.id)return['Playing…','go'];
-   const ts=p.hands.map(h=>{const t=H.total(h.cards).t;return h.cards.length===2&&!h.split&&t===21?'BJ':t>21?'Bust':t});
+   const ts=p.hands.map(h=>{if(h.cards.some(c=>!c))return 'Face down';const t=H.total(h.cards).t;return h.cards.length===2&&!h.split&&t===21?'BJ':t>21?'Bust':t});
    return[ts.join(' · '),''];
   }
   if(p.ready)return[p.bets.main?'Ready ✓':'Sitting out',p.bets.main?'ok':''];
@@ -934,13 +947,13 @@ body{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
  document.querySelectorAll('[data-chip]').forEach(b=>b.onclick=()=>{chip=+b.dataset.chip;SFX.chip();document.querySelectorAll('[data-chip]').forEach(x=>x.classList.toggle('on',x===b))});}
  chip=CHIPS.find(v=>v>=TIER().min)||CHIPS[0];renderChips();
  const fmtK=v=>fmt(v).replace('.00','');
- function showLimits(){const T=TIER();$('roomLine').textContent=`${T.name.toUpperCase()} · Bets ${fmtK(T.min)} minimum · no maximum on any bet`;$('tierBtn').textContent=`Table: ${T.name}`}
+ function showLimits(){const T=TIER();$('roomLine').textContent=`${T.name.toUpperCase()} · Bets ${fmtK(T.min)} minimum${T.sideMin?` · side bets ${fmtK(T.sideMin)} minimum`:''} · no maximum on any bet`;$('tierBtn').textContent=`Table: ${T.name}`}
  function setTier(t,save){if(!TIERS[t])t='lounge';tierId=t;if(save){try{localStorage.setItem('gs.bjTier',t)}catch(e){}}
   Object.assign(ROOM,{min:TIER().min,max:TIER().max,sideMax:TIER().sideMax});CHIPS=TIER_CHIPS[t]||TIER_CHIPS.lounge;chip=CHIPS.find(v=>v>=TIER().min)||CHIPS[0];renderChips();showLimits();if(typeof renderAll==='function'&&S)try{renderAll()}catch(e){}}
  let tierPick=tierId,afterTier=null;
  function openTiers(then){afterTier=then||null;tierPick=tierId;const fixed=S&&!S.solo;
   $('tNote').textContent=fixed?`This friends' table is ${TIER().name}. Start a new friends' table to play another one.`:"Each table has its own minimum. There's no maximum on any bet.";
-  $('tierList').innerHTML=Object.entries(TIERS).map(([id,T])=>`<button data-tier="${id}" style="--tf:${TIER_FELT[id]||'#333'}" ${fixed&&id!==tierId?'disabled':''}><i></i><b>${T.name}</b><span>${fmtK(T.min)} min</span><small>Bets ${fmtK(T.min)} and up · no maximum · chips ${short((TIER_CHIPS[id]||[5])[0])}–${short((TIER_CHIPS[id]||[5]).slice(-1)[0])}</small></button>`).join('');
+  $('tierList').innerHTML=Object.entries(TIERS).map(([id,T])=>`<button data-tier="${id}" style="--tf:${TIER_FELT[id]||'#333'}" ${fixed&&id!==tierId?'disabled':''}><i></i><b>${T.name}</b><span>${fmtK(T.min)} min</span><small>Bets ${fmtK(T.min)} and up${T.sideMin?` · side bets ${fmtK(T.sideMin)} and up`:''} · no maximum · chips ${short((TIER_CHIPS[id]||[5])[0])}–${short((TIER_CHIPS[id]||[5]).slice(-1)[0])}</small></button>`).join('');
   markTier();$('tiers').hidden=false}
  function markTier(){document.querySelectorAll('#tierList button').forEach(b=>b.classList.toggle('on',b.dataset.tier===tierPick));$('tierGo').textContent=`Sit down at ${(TIERS[tierPick]||TIER()).name}`}
  $('tierList').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.disabled)return;tierPick=b.dataset.tier;SFX.click();markTier()});
@@ -949,7 +962,7 @@ body{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
   if(S&&!S.solo){tierDone();return}
   if(t!==tierId){const p=me();if(S&&(S.phase==='hand'||(p&&p.ready))){SFX.nope();$('tNote').textContent='Finish this hand first, then move tables.';return}
    setTier(t,true);if(conn)conn.send({t:'tier',tier:t})}else setTier(t,true);
-  SFX.chip();message(`${TIER().name}: bets ${fmtK(TIER().min)} minimum, no maximum.`);tierDone()};
+  SFX.chip();message(`${TIER().name}: bets ${fmtK(TIER().min)} minimum${TIER().sideMin?`, side bets ${fmtK(TIER().sideMin)} minimum`:''}, no maximum.`);tierDone()};
  $('tiers').addEventListener('click',e=>{if(e.target.id==='tiers')tierDone()});
  $('tierBtn').onclick=()=>{SFX.click();openTiers()};
  showLimits();
@@ -988,7 +1001,7 @@ body{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
   $('dock').classList.toggle('playing',!!(S&&S.phase==='hand'&&!bustOpen()));   // the chips stay out while the Bust Bonus is open
  }
  const ACTS={deal:()=>deal(),clear:()=>clearBets(),repeat:()=>repeat(),unready:()=>unready(),
-  hit:()=>act('hit'),stand:()=>act('stand'),double:()=>act('double'),split:()=>act('split'),
+  hit:()=>act('hit'),stand:()=>act('stand'),double:()=>{SFX.click();$('dblPick').hidden=false},split:()=>act('split'),
   ins:()=>{SFX.chip();conn.send({t:'insure',yes:true})},noins:()=>{SFX.click();conn.send({t:'insure',yes:false})},
   go:()=>{SFX.click();const p=me();if(p)p.preDone=true;renderActs();conn.send({t:'go'})}};
  $('acts').addEventListener('click',e=>{const b=e.target.closest('button');if(b&&!b.disabled&&ACTS[b.id])ACTS[b.id]()});
@@ -1014,6 +1027,7 @@ body{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
    if(!bustOpen())return;
    const a=p.bets.bust+chip;
    if(a>ROOM.sideMax){SFX.nope();message(`The Bust Bonus maximum is ${fmt(ROOM.sideMax)}.`);return}
+   if(a<(TIER().sideMin||0)){SFX.nope();message(`Side bets at the ${TIER().name} table start at ${fmtK(TIER().sideMin)}. Pick a bigger chip.`);return}
    if(p.balance<chip){SFX.nope();message('Not enough chips for that.');return}
    p.balance-=chip;p.bets.bust=a;SFX.chip();renderSeats();renderMoney();conn.send({t:'bust',amount:a});
    message(`Bust Bonus ${fmt(a)}: pays 1 to 1 if the dealer busts, ${H.BUST[0][1]} to 1 if every card in the busted hand is the same suit.`);return;
@@ -1027,6 +1041,7 @@ body{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
    b.main+=chip;message(`Bet ${fmt(b.main)}. Keep some back if you want to double or split.`);
   }else if(k==='pair'){
    if(b.pair+chip>ROOM.sideMax){SFX.nope();message(`The Pair Bonus maximum is ${fmt(ROOM.sideMax)}.`);return}
+   if(b.pair+chip<(TIER().sideMin||0)){SFX.nope();message(`Side bets at the ${TIER().name} table start at ${fmtK(TIER().sideMin)}. Pick a bigger chip.`);return}
    if(have<chip){SFX.nope();message('Not enough chips for that.');return}
    b.pair+=chip;message(`Pair Bonus ${fmt(b.pair)}: a pair in your first two cards pays ${H.PAIR[1][1]} to 1, a suited pair ${H.PAIR[0][1]} to 1.`);
   }else return;
@@ -1051,7 +1066,12 @@ body{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
   if(!S.solo)message(p.bets.main?'You\'re in. The cards go out when everyone is ready, or when the clock runs out.':'You sit this hand out.');
  }
  function unready(){const p=me();if(!p||S.phase==='hand')return;SFX.click();p.ready=false;renderSeats();renderActs();conn.send({t:'unready'})}
- function act(a){SFX.click();if(a==='double'||a==='split'){SFX.chip();setTimeout(()=>SFX.chip(),90)}conn.send({t:'act',a})}
+ function act(a,extra){SFX.click();if(a==='double'||a==='split'){SFX.chip();setTimeout(()=>SFX.chip(),90)}conn.send(Object.assign({t:'act',a},extra||{}))}
+ // doubling: take the card face down (it turns over after the dealer finishes) or face up
+ $('dblDown').onclick=()=>{$('dblPick').hidden=true;act('double',{down:true});message('Doubled. Your card stays face down until the dealer finishes.')};
+ $('dblUp').onclick=()=>{$('dblPick').hidden=true;act('double',{down:false})};
+ $('dblNo').onclick=()=>{$('dblPick').hidden=true};
+ $('dblPick').addEventListener('click',e=>{if(e.target.id==='dblPick')$('dblPick').hidden=true});
 
  /* ---------- the clock at a friends' table ---------- */
  setInterval(()=>{

@@ -896,8 +896,8 @@ body:not(.rotated) .chipg span{font-size:.92rem}
  let balance=START_DEFAULT,chip=5,bets={};
  // Table tiers: each has its own limits per spot, chip values and felt (must match TIERS in server/server.js)
  const TIERS={
-  lounge: {name:'Lounge',      min:10,  max:500,   sideMin:5,   chips:[5,10,25,50,100,500],              felt:'#b0141f'},
-  high:   {name:'High Limit',  min:25,  max:5000,  sideMin:5,  chips:[25,50,100,500,1000,5000],         felt:'#0f6b45'},
+  lounge: {name:'Lounge',      min:10,  max:500,   sideMin:10,   chips:[5,10,25,50,100,500],              felt:'#b0141f'},
+  high:   {name:'High Limit',  min:25,  max:5000,  sideMin:25,  chips:[25,50,100,500,1000,5000],         felt:'#0f6b45'},
   vip:    {name:'VIP Salon',   min:100, max:25000, sideMin:50, chips:[50,100,500,1000,5000,10000,25000],felt:'#1d3f86'},
   private:{name:'Private Room',min:1000,max:100000,sideMin:100,chips:[50,100,1000,5000,10000,25000],        felt:'#2a2a30'},
   diamond:{name:'Diamond Room',min:10000,max:1000000000000,sideMin:100,pairMin:100,chips:[100,500,100000,500000,1000000,5000000,10000000,50000000,100000000,500000000,1000000000,5000000000,10000000000,50000000000,100000000000,500000000000,1000000000000],felt:'#3a1f5d'}};

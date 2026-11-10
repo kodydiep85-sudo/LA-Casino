@@ -7,10 +7,10 @@
   else root.GSCraps = factory();
 })(typeof self !== 'undefined' ? self : this, function () {
 
-// table limits, like the baccarat rooms: pick the table you want to play (numbers & line min-max; every side bet (props, hardways, the bonus) is $50 minimum; the bonus has no maximum)
+// table limits, like the baccarat rooms: pick the table you want to play (numbers & line min-max; side bets (props, hardways, the bonus) are $10 at the Lounge, $25 at High Limit and $50 from the VIP Salon up; the bonus has no maximum)
 const TIERS = {
-  lounge:  { name: 'Lounge',       min: 10,    max: 5000,      propMin: 50, hardMin: 50, bonusMin: 50 },
-  high:    { name: 'High Limit',   min: 25,    max: 50000,     propMin: 50, hardMin: 50, bonusMin: 50 },
+  lounge:  { name: 'Lounge',       min: 10,    max: 5000,      propMin: 10, hardMin: 10, bonusMin: 10 },
+  high:    { name: 'High Limit',   min: 25,    max: 50000,     propMin: 25, hardMin: 25, bonusMin: 25 },
   vip:     { name: 'VIP Salon',    min: 100,   max: 500000,    propMin: 50, hardMin: 50, bonusMin: 50 },
   private: { name: 'Private Room', min: 1000,  max: 5000000,   propMin: 50, hardMin: 50, bonusMin: 50 },
   diamond: { name: 'Diamond Room', min: 10000, max: 1000000000000, propMin: 50, hardMin: 50, bonusMin: 50 },

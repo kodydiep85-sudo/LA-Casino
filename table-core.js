@@ -11,8 +11,8 @@ const START_BANKROLL = 5000;
 const START_MIN = 100, START_MAX = 10000000;   // players may pick their own starting chips in this range
 // Table tiers: each table has its own limits per betting spot (must match TIERS in www/index.html)
 const TIERS = {
-  lounge:  { name: 'Lounge',       min: 10,   max: 500,    sideMin: 5 },
-  high:    { name: 'High Limit',   min: 25,   max: 5000,   sideMin: 5 },
+  lounge:  { name: 'Lounge',       min: 10,   max: 500,    sideMin: 10 },
+  high:    { name: 'High Limit',   min: 25,   max: 5000,   sideMin: 25 },
   vip:     { name: 'VIP Salon',    min: 100,  max: 25000,  sideMin: 50 },
   private: { name: 'Private Room', min: 1000, max: 100000, sideMin: 100 },
   diamond: { name: 'Diamond Room', min: 10000, max: 1000000000000, sideMin: 100, pairMin: 100 },

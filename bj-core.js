@@ -12,11 +12,11 @@
 const ROOM = { name: 'The Lounge', min: 5, max: 500, sideMax: 100, seats: 5 };
 // table limits, like the baccarat rooms: pick your table; no maximum on any bet (the jackpot light stays $5)
 const TIERS = {
-  lounge:  { name: 'Lounge',       min: 5,     max: 1e12, sideMax: 1e12 },
-  high:    { name: 'High Limit',   min: 25,    max: 1e12, sideMax: 1e12 },
-  vip:     { name: 'VIP Salon',    min: 100,   max: 1e12, sideMax: 1e12 },
-  private: { name: 'Private Room', min: 1000,  max: 1e12, sideMax: 1e12 },
-  diamond: { name: 'Diamond Room', min: 10000, max: 1e12, sideMax: 1e12 },
+  lounge:  { name: 'Lounge',       min: 10,    max: 1e12, sideMax: 1e12, sideMin: 10 },
+  high:    { name: 'High Limit',   min: 25,    max: 1e12, sideMax: 1e12, sideMin: 25 },
+  vip:     { name: 'VIP Salon',    min: 100,   max: 1e12, sideMax: 1e12, sideMin: 0 },
+  private: { name: 'Private Room', min: 1000,  max: 1e12, sideMax: 1e12, sideMin: 0 },
+  diamond: { name: 'Diamond Room', min: 10000, max: 1e12, sideMax: 1e12, sideMin: 0 },
 };
 const LIM = room => TIERS[room && room.tier] || TIERS.lounge;
 // Pair Bonus: your first two cards are a pair (same rank). Suited pairs pay more.
@@ -75,7 +75,7 @@ function publicState(room) {
     turn: room.turn || null, dealer: d.map((c, i) => i === 1 && !room.holeShown ? null : c), peeked: !!room.peeked,
     players: [...room.players.values()].map(p => ({ id: p.id, name: p.name, seat: p.seat, balance: p.balance, bets: p.bets, ready: p.ready,
       inHand: !!p.inHand, preDone: !!p.preDone, insured: p.insured === undefined ? null : p.insured, away: !!p.away,
-      hands: (p.hands || []).map(h => ({ cards: h.cards, bet: h.bet, done: !!h.done, doubled: !!h.doubled, split: !!h.split })) })),
+      hands: (p.hands || []).map(h => ({ cards: h.down && room.phase !== 'result' ? [...h.cards.slice(0, -1), null] : h.cards, down: !!h.down, bet: h.bet, done: !!h.done, doubled: !!h.doubled, split: !!h.split })) })),
   };
 }
 const pushState = room => broadcast(room, publicState(room));
@@ -148,7 +148,7 @@ function nextTurn(room) {
   }
   room.turn = null; dealerPlay(room);
 }
-function act(room, p, a, auto) {
+function act(room, p, a, auto, down) {
   if (room.phase !== 'hand') return;
   if (room.stage === 'pre') {   // solo: playing your hand closes the Bust Bonus / insurance window
     if (!room.solo || !['hit', 'stand', 'double', 'split'].includes(a)) return;
@@ -162,7 +162,7 @@ function act(room, p, a, auto) {
   else if (a === 'double') {
     if (h.cards.length !== 2 || h.splitAces) return send(p.ws, { t: 'error', msg: 'You can double on your first two cards only.' });
     if (p.balance < h.bet) return send(p.ws, { t: 'error', msg: `You need ${money(h.bet)} to double.` });
-    p.balance -= h.bet; h.bet *= 2; h.doubled = true; h.cards.push(draw(room)); h.done = true;
+    p.balance -= h.bet; h.bet *= 2; h.doubled = true; h.down = !!down; h.cards.push(draw(room)); h.done = true;
   } else if (a === 'split') {
     if (h.cards.length !== 2 || val(h.cards[0]) !== val(h.cards[1])) return send(p.ws, { t: 'error', msg: 'You can split two cards of the same value.' });
     if (p.hands.length >= 4) return send(p.ws, { t: 'error', msg: 'Four hands is the most you can split to.' });
@@ -273,6 +273,7 @@ function handle(ws, msg) {
       const b = msg.bets || {}, main = Math.floor(+b.main || 0), pair = Math.floor(+b.pair || 0);
       if (main < 0 || pair < 0) return;
       if (main > LIM(room).max) { send(ws, { t: 'error', msg: `The table maximum is ${money(LIM(room).max)}.` }); return pushState(room); }
+      if ((pair && pair < LIM(room).sideMin)) { send(ws, { t: 'error', msg: `Side bets at the ${LIM(room).name} table start at ${money(LIM(room).sideMin)}.` }); return pushState(room); }
       if (pair > LIM(room).sideMax) { send(ws, { t: 'error', msg: `The Pair Bonus goes up to ${money(LIM(room).sideMax)}.` }); return pushState(room); }
       const have = me.balance + me.bets.main + me.bets.pair;
       if (main + pair > have) { send(ws, { t: 'error', msg: 'Not enough chips for that.' }); return pushState(room); }
@@ -283,6 +284,7 @@ function handle(ws, msg) {
       if (room.phase !== 'hand' || room.stage !== 'pre' || !me.inHand || me.preDone) return pushState(room);
       const a = Math.floor(+msg.amount || 0);
       if (a < 0) return;
+      if ((a && a < LIM(room).sideMin)) { send(ws, { t: 'error', msg: `Side bets at the ${LIM(room).name} table start at ${money(LIM(room).sideMin)}.` }); return pushState(room); }
       if (a > LIM(room).sideMax) { send(ws, { t: 'error', msg: `The Bust Bonus goes up to ${money(LIM(room).sideMax)}.` }); return pushState(room); }
       if (a - me.bets.bust > me.balance) { send(ws, { t: 'error', msg: 'Not enough chips for that.' }); return pushState(room); }
       me.balance -= a - me.bets.bust; me.bets.bust = a; return pushState(room);
@@ -314,7 +316,7 @@ function handle(ws, msg) {
       if (!room.solo || room.phase === 'hand') return;
       const d = +msg.decks === 2 ? 2 : 6; if (d !== room.decks) { room.decks = d; room.shoe = freshShoe(d); } return pushState(room);
     }
-    case 'act': return act(room, me, String(msg.a));
+    case 'act': return act(room, me, String(msg.a), false, !!msg.down);
     case 'rebuy': {
       if (room.phase === 'hand' || stake(me)) return send(ws, { t: 'error', msg: 'Clear your bets first.' });
       const a = Math.floor(+msg.amount); if (a >= 100 && a <= 1e15) me.balance = a; return pushState(room);

@@ -10,11 +10,11 @@
 const ROOM = { name: 'The Pavilion', min: 5, max: 500, sideMax: 100, jackpotBet: 5, seats: 5 };
 // table limits, like the baccarat rooms: pick your table; no maximum on any bet (the jackpot light stays $5)
 const TIERS = {
-  lounge:  { name: 'Lounge',       min: 5,     max: 1e12, sideMax: 1e12 },
-  high:    { name: 'High Limit',   min: 25,    max: 1e12, sideMax: 1e12 },
-  vip:     { name: 'VIP Salon',    min: 100,   max: 1e12, sideMax: 1e12 },
-  private: { name: 'Private Room', min: 1000,  max: 1e12, sideMax: 1e12 },
-  diamond: { name: 'Diamond Room', min: 10000, max: 1e12, sideMax: 1e12 },
+  lounge:  { name: 'Lounge',       min: 10,    max: 1e12, sideMax: 1e12, sideMin: 10 },
+  high:    { name: 'High Limit',   min: 25,    max: 1e12, sideMax: 1e12, sideMin: 25 },
+  vip:     { name: 'VIP Salon',    min: 100,   max: 1e12, sideMax: 1e12, sideMin: 0 },
+  private: { name: 'Private Room', min: 1000,  max: 1e12, sideMax: 1e12, sideMin: 0 },
+  diamond: { name: 'Diamond Room', min: 10000, max: 1e12, sideMax: 1e12, sideMin: 0 },
 };
 const LIM = room => TIERS[room && room.tier] || TIERS.lounge;
 // Bonus: your seven cards, win or lose (the standard Fortune pay table)
@@ -345,6 +345,7 @@ function handle(ws, msg) {
       const b = msg.bets || {}, main = Math.floor(+b.main || 0), bonus = Math.floor(+b.bonus || 0), ace = Math.floor(+b.ace || 0), jack = b.jack ? ROOM.jackpotBet : 0;
       if (main < 0 || bonus < 0 || ace < 0) return;
       if (main > LIM(room).max) { send(ws, { t: 'error', msg: `The table maximum is ${money(LIM(room).max)}.` }); return pushState(room); }
+      if ((bonus && bonus < LIM(room).sideMin) || (ace && ace < LIM(room).sideMin)) { send(ws, { t: 'error', msg: `Side bets at the ${LIM(room).name} table start at ${money(LIM(room).sideMin)}.` }); return pushState(room); }
       if (bonus > LIM(room).sideMax || ace > LIM(room).sideMax) { send(ws, { t: 'error', msg: `The Bonus and Ace High go up to ${money(LIM(room).sideMax)}.` }); return pushState(room); }
       const want = main + bonus + ace + jack, have = me.balance + stake(me);
       if (want > have) { send(ws, { t: 'error', msg: 'Not enough chips for that.' }); return pushState(room); }
